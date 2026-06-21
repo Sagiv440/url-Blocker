@@ -65,7 +65,7 @@ static void draw(Tui& tui, const StatsSnapshot& snap,
     {
         tui.move(1, 1);
         tui.emit(ansi::BOLD); tui.emit(ansi::REVERSE); tui.emit(ansi::BG_BLUE);
-        const std::string title = " WebBlock  Network Monitor & DNS Firewall ";
+        const std::string title = " URLBlocker  Network Monitor & DNS Firewall ";
         const int pad = (cols - static_cast<int>(title.size())) / 2;
         if (pad > 0) tui.emit(std::string(pad, ' '));
         tui.emit(title);
@@ -240,7 +240,7 @@ static void print_usage(const char* prog) {
         "  -p PORT    Local proxy port         (default: 15353)\n"
         "  -h         Show this help\n"
         "\n"
-        "Must be run as root (sudo ./webblock).\n"
+        "Must be run as root (sudo ./urlblocker).\n"
         "\n"
         "How it works:\n"
         "  1. Installs iptables NAT rules to redirect all local DNS traffic\n"
@@ -271,7 +271,7 @@ int main(int argc, char* argv[]) {
 
     // Root check
     if (geteuid() != 0) {
-        fprintf(stderr, "Error: webblock requires root privileges.\n"
+        fprintf(stderr, "Error: urlblocker requires root privileges.\n"
                         "       Run with: sudo %s\n", argv[0]);
         return 1;
     }
@@ -347,6 +347,6 @@ int main(int argc, char* argv[]) {
     proxy_thread.join();
     // ipt destructor removes iptables rules automatically
 
-    fprintf(stderr, "\nwebblock stopped. iptables rules removed.\n");
+    fprintf(stderr, "\nurlblocker stopped. iptables rules removed.\n");
     return 0;
 }

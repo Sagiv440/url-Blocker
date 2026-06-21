@@ -35,7 +35,7 @@ sudo apt install build-essential cmake iptables
 
 ```bash
 # 1. Clone or download the project
-cd WebBlockDamon
+cd urlblocker
 
 # 2. Configure
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -44,20 +44,20 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -- -j$(nproc)
 ```
 
-The binary is created at `build/webblock`.
+The binary is created at `build/urlblocker`.
 
 ---
 
 ## Run interactively (with TUI)
 
 ```bash
-sudo ./build/webblock
+sudo ./build/urlblocker
 ```
 
 Optional flags:
 
 ```bash
-sudo ./build/webblock -b blocklist.txt -u 8.8.8.8:53 -p 15353
+sudo ./build/urlblocker -b blocklist.txt -u 8.8.8.8:53 -p 15353
 ```
 
 | Flag | Default | Description |
@@ -98,34 +98,34 @@ A default `blocklist.txt` is included with ad networks, trackers, social media p
 
 ## Run as a background service (start on boot)
 
-This installs WebBlock as a systemd service so it runs automatically on every boot.
+This installs URLBlocker as a systemd service so it runs automatically on every boot.
 
-### Step 1 — Copy files to /opt/webblock
+### Step 1 — Copy files to /opt/urlblocker
 
 ```bash
-sudo mkdir -p /opt/webblock
-sudo cp build/webblock /opt/webblock/
-sudo cp blocklist.txt /opt/webblock/
+sudo mkdir -p /opt/urlblocker
+sudo cp build/urlblocker /opt/urlblocker/
+sudo cp blocklist.txt /opt/urlblocker/
 ```
 
 ### Step 2 — Install the service
 
 ```bash
-sudo cp webblock.service /etc/systemd/system/
+sudo cp urlblocker.service /etc/systemd/system/
 sudo systemctl daemon-reload
 ```
 
 ### Step 3 — Enable and start
 
 ```bash
-sudo systemctl enable webblock   # start on boot
-sudo systemctl start webblock    # start now
+sudo systemctl enable urlblocker   # start on boot
+sudo systemctl start urlblocker    # start now
 ```
 
 ### Step 4 — Verify it's running
 
 ```bash
-sudo systemctl status webblock
+sudo systemctl status urlblocker
 ```
 
 You should see `Active: active (running)`.
@@ -135,10 +135,10 @@ You should see `Active: active (running)`.
 ## Managing the service
 
 ```bash
-sudo systemctl stop webblock      # stop
-sudo systemctl restart webblock   # restart
-sudo systemctl disable webblock   # don't start on boot
-sudo journalctl -u webblock -f    # view live logs
+sudo systemctl stop urlblocker      # stop
+sudo systemctl restart urlblocker   # restart
+sudo systemctl disable urlblocker   # don't start on boot
+sudo journalctl -u urlblocker -f    # view live logs
 ```
 
 ## View the live TUI while the service is running
@@ -146,16 +146,16 @@ sudo journalctl -u webblock -f    # view live logs
 The TUI is only available when running interactively. To use it:
 
 ```bash
-sudo systemctl stop webblock      # stop the background service
-sudo /opt/webblock/webblock       # run with TUI
+sudo systemctl stop urlblocker      # stop the background service
+sudo /opt/urlblocker/urlblocker       # run with TUI
 # Press q to exit, then restart the service:
-sudo systemctl start webblock
+sudo systemctl start urlblocker
 ```
 
 ---
 
 ## Updating the blocklist
 
-Edit `/opt/webblock/blocklist.txt` and either:
-- Restart the service: `sudo systemctl restart webblock`
+Edit `/opt/urlblocker/blocklist.txt` and either:
+- Restart the service: `sudo systemctl restart urlblocker`
 - Or if running interactively, press `r` to reload without restarting

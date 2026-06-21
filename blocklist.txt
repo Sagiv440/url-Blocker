@@ -1,4 +1,4 @@
-# WebBlock - Domain Blocklist
+# URLBlocker - Domain Blocklist
 # One domain per line. Lines starting with # are comments.
 # Subdomains are automatically blocked when a parent domain is listed.
 # Example: listing "ads.com" also blocks "tracker.ads.com"

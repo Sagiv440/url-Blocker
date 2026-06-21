@@ -1,14 +1,14 @@
 [Unit]
-Description=WebBlock DNS Firewall
+Description=URLBlocker DNS Firewall
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/webblock/webblock \
+ExecStart=/opt/urlblocker/urlblocker \
     -b blocklist.txt \
     -u 8.8.8.8:53 \
     -p 15353
-WorkingDirectory=/opt/webblock
+WorkingDirectory=/opt/urlblocker
 Restart=on-failure
 RestartSec=5
 

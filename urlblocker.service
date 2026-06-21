@@ -4,11 +4,10 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/urlblocker/urlblocker \
-    -b blocklist.txt \
+ExecStart=<location/to/urlblocker> \
+    -b <location/to/blocklist.txt> \
     -u 8.8.8.8:53 \
     -p 15353
-WorkingDirectory=/opt/urlblocker
 Restart=on-failure
 RestartSec=5
 

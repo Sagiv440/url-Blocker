@@ -1,4 +1,4 @@
-# WebBlock
+# url-Blocker
 
 A lightweight DNS firewall for Linux. Intercepts DNS queries and blocks domains from a blocklist, returning NXDOMAIN for blocked sites. Includes a live terminal UI showing blocked/allowed queries in real time.
 

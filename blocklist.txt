@@ -1,0 +1,82 @@
+# WebBlock - Domain Blocklist
+# One domain per line. Lines starting with # are comments.
+# Subdomains are automatically blocked when a parent domain is listed.
+# Example: listing "ads.com" also blocks "tracker.ads.com"
+
+# --- Ad Networks ---
+doubleclick.net
+googleadservices.com
+googlesyndication.com
+adservice.google.com
+ads.google.com
+pagead2.googlesyndication.com
+adnxs.com
+adsrvr.org
+advertising.com
+rubiconproject.com
+openx.net
+pubmatic.com
+casalemedia.com
+yieldmanager.com
+advertising.yahoo.com
+ads.yahoo.com
+ad.yieldmanager.com
+smartadserver.com
+adform.net
+criteo.com
+criteo.net
+serving-sys.com
+s.amazon-adsystem.com
+aax-us-east.amazon-adsystem.com
+aax.amazon-adsystem.com
+
+# --- Trackers & Analytics ---
+scorecardresearch.com
+quantserve.com
+comscore.com
+clicktale.net
+hotjar.com
+mixpanel.com
+segment.com
+segment.io
+kissmetrics.com
+heapanalytics.com
+fullstory.com
+loggly.com
+bugsnag.com
+sentry.io
+datadog-browser-agent.com
+newrelic.com
+nr-data.net
+mouseflow.com
+crazyegg.com
+heatmaps.net
+
+# --- Social Media Trackers ---
+connect.facebook.net
+graph.facebook.com
+staticxx.facebook.com
+www.facebook.com
+pixel.facebook.com
+tr.snapchat.com
+ct.pinterest.com
+ads.twitter.com
+analytics.twitter.com
+t.co
+twttr.com
+
+# --- Malware / Phishing (sample) ---
+malware-domain.example
+phishing-site.example
+free-virus-scan.example
+
+# --- Telemetry ---
+telemetry.microsoft.com
+vortex.data.microsoft.com
+watson.telemetry.microsoft.com
+spynet2.microsoft.com
+settings-win.data.microsoft.com
+activity.windows.com
+browser.pipe.aria.microsoft.com
+
+# Add your own below:

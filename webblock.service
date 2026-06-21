@@ -1,0 +1,16 @@
+[Unit]
+Description=WebBlock DNS Firewall
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/webblock/webblock \
+    -b blocklist.txt \
+    -u 8.8.8.8:53 \
+    -p 15353
+WorkingDirectory=/opt/webblock
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

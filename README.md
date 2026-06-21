@@ -100,13 +100,34 @@ A default `blocklist.txt` is included with ad networks, trackers, social media p
 
 This installs URLBlocker as a systemd service so it runs automatically on every boot.
 
-### Step 1 — Copy files to /opt/urlblocker
+### Step 1 — Modify Service file
 
 ```bash
-sudo mkdir -p /opt/urlblocker
-sudo cp build/urlblocker /opt/urlblocker/
-sudo cp blocklist.txt /opt/urlblocker/
+nano urlblocker.service
 ```
+Change: ```<location/to/urlblocker>``` to the **app** file localtion
+
+Change: ```<location/to/blocklist.txt>``` to your **blocklist.txt** file localtion
+
+*urlblocker.service*
+```bash
+[Unit]
+Description=URLBlocker DNS Firewall
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=<location/to/urlblocker> \
+    -b <location/to/blocklist.txt> \
+    -u 8.8.8.8:53 \
+    -p 15353
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
 
 ### Step 2 — Install the service
 

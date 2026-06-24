@@ -35,7 +35,7 @@ sudo apt install build-essential cmake iptables
 
 ```bash
 # 1. Clone or download the project
-cd urlblocker
+cd url-Blocker
 
 # 2. Configure
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -44,20 +44,20 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -- -j$(nproc)
 ```
 
-The binary is created at `build/urlblocker`.
+The binary is created at `build/url-block`.
 
 ---
 
 ## Run interactively (with TUI)
 
 ```bash
-sudo ./build/urlblocker
+sudo ./build/url-block
 ```
 
 Optional flags:
 
 ```bash
-sudo ./build/urlblocker -b blocklist.txt -u 8.8.8.8:53 -p 15353
+sudo ./build/url-block -b blocklist.txt -u 8.8.8.8:53 -p 15353
 ```
 
 | Flag | Default | Description |
@@ -98,55 +98,34 @@ A default `blocklist.txt` is included with ad networks, trackers, social media p
 
 ## Run as a background service (start on boot)
 
-This installs URLBlocker as a systemd service so it runs automatically on every boot.
+This installs url-block as a systemd service so it runs automatically on every boot.
 
-### Step 1 — Modify Service file
+### Step 1 — Copy files to /opt/url-block
 
 ```bash
-nano urlblocker.service
+sudo mkdir -p /opt/url-block
+sudo cp build/url-block /opt/url-block/
+sudo cp blocklist.txt /opt/url-block/
 ```
-Change: ```<location/to/urlblocker>``` to the **app** file localtion
-
-Change: ```<location/to/blocklist.txt>``` to your **blocklist.txt** file localtion
-
-*urlblocker.service*
-```bash
-[Unit]
-Description=URLBlocker DNS Firewall
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=<location/to/urlblocker> \
-    -b <location/to/blocklist.txt> \
-    -u 8.8.8.8:53 \
-    -p 15353
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
 
 ### Step 2 — Install the service
 
 ```bash
-sudo cp urlblocker.service /etc/systemd/system/
+sudo cp url-block.service /etc/systemd/system/
 sudo systemctl daemon-reload
 ```
 
 ### Step 3 — Enable and start
 
 ```bash
-sudo systemctl enable urlblocker   # start on boot
-sudo systemctl start urlblocker    # start now
+sudo systemctl enable url-block   # start on boot
+sudo systemctl start url-block    # start now
 ```
 
 ### Step 4 — Verify it's running
 
 ```bash
-sudo systemctl status urlblocker
+sudo systemctl status url-block
 ```
 
 You should see `Active: active (running)`.
@@ -156,10 +135,10 @@ You should see `Active: active (running)`.
 ## Managing the service
 
 ```bash
-sudo systemctl stop urlblocker      # stop
-sudo systemctl restart urlblocker   # restart
-sudo systemctl disable urlblocker   # don't start on boot
-sudo journalctl -u urlblocker -f    # view live logs
+sudo systemctl stop url-block      # stop
+sudo systemctl restart url-block   # restart
+sudo systemctl disable url-block   # don't start on boot
+sudo journalctl -u url-block -f    # view live logs
 ```
 
 ## View the live TUI while the service is running
@@ -167,16 +146,16 @@ sudo journalctl -u urlblocker -f    # view live logs
 The TUI is only available when running interactively. To use it:
 
 ```bash
-sudo systemctl stop urlblocker      # stop the background service
-sudo /opt/urlblocker/urlblocker       # run with TUI
+sudo systemctl stop url-block       # stop the background service
+sudo /opt/url-block/url-block       # run with TUI
 # Press q to exit, then restart the service:
-sudo systemctl start urlblocker
+sudo systemctl start url-block
 ```
 
 ---
 
 ## Updating the blocklist
 
-Edit `/opt/urlblocker/blocklist.txt` and either:
-- Restart the service: `sudo systemctl restart urlblocker`
+Edit `/opt/url-block/blocklist.txt` and either:
+- Restart the service: `sudo systemctl restart url-block`
 - Or if running interactively, press `r` to reload without restarting

@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=<location/to/urlblocker> \
+ExecStart=<location/to/url-block> \
     -b <location/to/blocklist.txt> \
     -u 8.8.8.8:53 \
     -p 15353

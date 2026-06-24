@@ -5,13 +5,16 @@
 #include "tui.hpp"
 
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <csignal>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <fcntl.h>
 #include <memory>
 #include <string>
+#include <sys/file.h>
 #include <thread>
 #include <unistd.h>
 
@@ -65,7 +68,7 @@ static void draw(Tui& tui, const StatsSnapshot& snap,
     {
         tui.move(1, 1);
         tui.emit(ansi::BOLD); tui.emit(ansi::REVERSE); tui.emit(ansi::BG_BLUE);
-        const std::string title = " URLBlocker  Network Monitor & DNS Firewall ";
+        const std::string title = " url-block  Network Monitor & DNS Firewall ";
         const int pad = (cols - static_cast<int>(title.size())) / 2;
         if (pad > 0) tui.emit(std::string(pad, ' '));
         tui.emit(title);
@@ -240,7 +243,7 @@ static void print_usage(const char* prog) {
         "  -p PORT    Local proxy port         (default: 15353)\n"
         "  -h         Show this help\n"
         "\n"
-        "Must be run as root (sudo ./urlblocker).\n"
+        "Must be run as root (sudo ./url-block).\n"
         "\n"
         "How it works:\n"
         "  1. Installs iptables NAT rules to redirect all local DNS traffic\n"
@@ -271,10 +274,23 @@ int main(int argc, char* argv[]) {
 
     // Root check
     if (geteuid() != 0) {
-        fprintf(stderr, "Error: urlblocker requires root privileges.\n"
+        fprintf(stderr, "Error: url-block requires root privileges.\n"
                         "       Run with: sudo %s\n", argv[0]);
         return 1;
     }
+
+    // Single-instance lock — prevents two instances fighting over port and iptables rules
+    const int lock_fd = open("/var/run/url-block.lock", O_CREAT | O_RDWR, 0644);
+    if (lock_fd < 0) {
+        fprintf(stderr, "Error: could not open lock file: %s\n", strerror(errno));
+        return 1;
+    }
+    if (flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
+        fprintf(stderr, "url-block is already running.\n");
+        close(lock_fd);
+        return 1;
+    }
+    // lock_fd stays open until process exits — lock released automatically
 
     // Load blocklist
     auto blocklist = std::make_shared<Blocklist>();
@@ -347,6 +363,6 @@ int main(int argc, char* argv[]) {
     proxy_thread.join();
     // ipt destructor removes iptables rules automatically
 
-    fprintf(stderr, "\nurlblocker stopped. iptables rules removed.\n");
+    fprintf(stderr, "\nurl-block stopped. iptables rules removed.\n");
     return 0;
 }

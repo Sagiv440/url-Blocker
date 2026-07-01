@@ -32,8 +32,32 @@ using TrafficGuard = IptablesGuard;
 // ─── Global shutdown flag (set by signal handler) ───────────────────────────
 
 static std::atomic<bool> g_running{true};
+static std::atomic<bool> g_cleanup_done{false};
 
 static void on_signal(int) { g_running = false; }
+
+#ifdef _WIN32
+// Console control events (window close, logoff, service/system shutdown) do
+// NOT map to SIGINT the way Ctrl+C does, so without this handler those paths
+// would skip DNS cleanup entirely and leave adapters pointed at 127.0.0.1.
+// We block here until the main thread finishes restoring DNS, since Windows
+// force-kills the process shortly after this callback returns.
+static BOOL WINAPI console_ctrl_handler(DWORD ctrl_type) {
+    switch (ctrl_type) {
+        case CTRL_C_EVENT:
+        case CTRL_BREAK_EVENT:
+        case CTRL_CLOSE_EVENT:
+        case CTRL_LOGOFF_EVENT:
+        case CTRL_SHUTDOWN_EVENT:
+            g_running = false;
+            for (int waited_ms = 0; waited_ms < 4000 && !g_cleanup_done; waited_ms += 50)
+                Sleep(50);
+            return TRUE;
+        default:
+            return FALSE;
+    }
+}
+#endif
 
 // ─── UI layout constants ─────────────────────────────────────────────────────
 
@@ -252,6 +276,9 @@ static void print_usage(const char* prog) {
         "  -b FILE    Blocklist file           (default: blocklist.txt)\n"
         "  -u ADDR    Upstream DNS server      (default: 8.8.8.8:53)\n"
         "  -p PORT    Local proxy port         (default: 15353)\n"
+        "  -d         Daemon/service mode: no TUI (use when run unattended,\n"
+        "             e.g. under systemd or a Windows service — otherwise the\n"
+        "             live redraw fills stdout/journal logs pointlessly)\n"
         "  -h         Show this help\n"
         "\n"
         "Must be run as root (sudo ./url-block).\n"
@@ -269,6 +296,7 @@ static void print_usage(const char* prog) {
 int main(int argc, char* argv[]) {
     std::string blocklist_path = "blocklist.txt";
     std::string upstream       = "8.8.8.8:53";
+    bool daemon_mode = false;
 #ifdef _WIN32
     uint16_t port = 53;    // netsh points DNS to 127.0.0.1:53 — must use port 53
 #else
@@ -283,6 +311,7 @@ int main(int argc, char* argv[]) {
             try { port = static_cast<uint16_t>(std::stoi(argv[++i])); }
             catch (...) { fprintf(stderr, "Invalid port\n"); return 1; }
         }
+        else if (arg == "-d" || arg == "--daemon") { daemon_mode = true; }
         else if (arg == "-h" || arg == "--help") { print_usage(argv[0]); return 0; }
         else { fprintf(stderr, "Unknown option: %s\n", arg.c_str()); return 1; }
     }
@@ -310,6 +339,8 @@ int main(int argc, char* argv[]) {
         WSACleanup();
         return 1;
     }
+
+    SetConsoleCtrlHandler(console_ctrl_handler, TRUE);
 #else
     // Root check
     if (geteuid() != 0) {
@@ -367,48 +398,57 @@ int main(int argc, char* argv[]) {
     DnsProxy proxy(port, upstream, blocklist, stats);
     std::thread proxy_thread([&proxy] { proxy.run(); });
 
-    // ── TUI loop ──────────────────────────────────────────────────────────
-    Tui tui;
-    tui.init();
+    if (daemon_mode) {
+        // No TUI: an unattended service/systemd redraw loop would just spam
+        // stdout/journal with ANSI frames nobody reads. Idle until signaled.
+        fprintf(stderr, "url-block running in daemon mode (no TUI). %zu domains loaded.\n", bl_sz);
+        while (g_running)
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    } else {
+        // ── TUI loop ──────────────────────────────────────────────────────
+        Tui tui;
+        tui.init();
 
-    using Clock = std::chrono::steady_clock;
-    auto last_draw = Clock::now() - std::chrono::seconds(1);
+        using Clock = std::chrono::steady_clock;
+        auto last_draw = Clock::now() - std::chrono::seconds(1);
 
-    while (g_running) {
-        // Handle keyboard input (non-blocking)
-        const int ch = tui.getch();
-        switch (ch) {
-            case 'q': case 'Q': case 3: // Ctrl-C
-                g_running = false;
-                break;
-            case 'c': case 'C':
-                stats->clear();
-                break;
-            case 'r': case 'R': {
-                const size_t n = blocklist->load(blocklist_path);
-                (void)n; // reload success visible through blocklist size update
-                break;
+        while (g_running) {
+            // Handle keyboard input (non-blocking)
+            const int ch = tui.getch();
+            switch (ch) {
+                case 'q': case 'Q': case 3: // Ctrl-C
+                    g_running = false;
+                    break;
+                case 'c': case 'C':
+                    stats->clear();
+                    break;
+                case 'r': case 'R': {
+                    const size_t n = blocklist->load(blocklist_path);
+                    (void)n; // reload success visible through blocklist size update
+                    break;
+                }
+                default: break;
             }
-            default: break;
+
+            // Redraw at ~5 Hz
+            const auto now = Clock::now();
+            if (now - last_draw >= std::chrono::milliseconds(200)) {
+                const auto snap = stats->snapshot(10);
+                draw(tui, snap, blocklist->size(), upstream, port, blocklist_path);
+                last_draw = now;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
 
-        // Redraw at ~5 Hz
-        const auto now = Clock::now();
-        if (now - last_draw >= std::chrono::milliseconds(200)) {
-            const auto snap = stats->snapshot(10);
-            draw(tui, snap, blocklist->size(), upstream, port, blocklist_path);
-            last_draw = now;
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        tui.fini();
     }
-
-    tui.fini();
 
     // Graceful shutdown
     proxy.stop();
     proxy_thread.join();
-    // ipt destructor removes iptables rules automatically
+    ipt.cleanup(); // explicit: must finish before console_ctrl_handler stops blocking below
+    g_cleanup_done = true;
 
 #ifdef _WIN32
     WSACleanup();

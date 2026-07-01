@@ -28,6 +28,15 @@ public:
         if (!ipt("-t nat -I OUTPUT 3 -p udp --dport 53 -j REDIRECT --to-port " + p)) return false;
         if (!ipt("-t nat -I OUTPUT 4 -p tcp --dport 53 -j REDIRECT --to-port " + p)) return false;
 
+        // Mirror the same rules for IPv6 — otherwise queries sent to an IPv6
+        // DNS server (common with router-advertised RDNSS) bypass the redirect
+        // entirely. ip6tables NAT support may be unavailable on some kernels,
+        // so failures here are non-fatal: IPv4 blocking still works either way.
+        ipt6("-t nat -I OUTPUT 1 -p udp --dport 53 -m mark --mark 42 -j ACCEPT");
+        ipt6("-t nat -I OUTPUT 2 -p tcp --dport 53 -m mark --mark 42 -j ACCEPT");
+        ipt6("-t nat -I OUTPUT 3 -p udp --dport 53 -j REDIRECT --to-port " + p);
+        ipt6("-t nat -I OUTPUT 4 -p tcp --dport 53 -j REDIRECT --to-port " + p);
+
         active_ = true;
         return true;
     }
@@ -40,6 +49,10 @@ public:
         ipt("-t nat -D OUTPUT -p tcp --dport 53 -m mark --mark 42 -j ACCEPT");
         ipt("-t nat -D OUTPUT -p udp --dport 53 -j REDIRECT --to-port " + p);
         ipt("-t nat -D OUTPUT -p tcp --dport 53 -j REDIRECT --to-port " + p);
+        ipt6("-t nat -D OUTPUT -p udp --dport 53 -m mark --mark 42 -j ACCEPT");
+        ipt6("-t nat -D OUTPUT -p tcp --dport 53 -m mark --mark 42 -j ACCEPT");
+        ipt6("-t nat -D OUTPUT -p udp --dport 53 -j REDIRECT --to-port " + p);
+        ipt6("-t nat -D OUTPUT -p tcp --dport 53 -j REDIRECT --to-port " + p);
     }
 
 private:
@@ -48,5 +61,9 @@ private:
 
     static bool ipt(const std::string& args) {
         return std::system(("iptables " + args + " >/dev/null 2>&1").c_str()) == 0;
+    }
+
+    static bool ipt6(const std::string& args) {
+        return std::system(("ip6tables " + args + " >/dev/null 2>&1").c_str()) == 0;
     }
 };

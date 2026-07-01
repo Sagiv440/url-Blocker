@@ -1,1 +1,4 @@
 build/
+url-block.service
+service-logs/stderr.log
+service-logs/stdout.log

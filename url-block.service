@@ -7,7 +7,8 @@ Type=simple
 ExecStart=<location/to/url-block> \
     -b <location/to/blocklist.txt> \
     -u 8.8.8.8:53 \
-    -p 15353
+    -p 15353 \
+    -d
 Restart=on-failure
 RestartSec=5
 

@@ -1,22 +1,33 @@
 #include "blocklist.hpp"
-#include "iptables.hpp"
 #include "proxy.hpp"
 #include "stats.hpp"
 #include "tui.hpp"
 
 #include <atomic>
-#include <cerrno>
 #include <chrono>
 #include <csignal>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
-#include <fcntl.h>
 #include <memory>
 #include <string>
-#include <sys/file.h>
 #include <thread>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <windows.h>
+#include <shlobj.h>
+#include "windows_dns_guard.hpp"
+using TrafficGuard = WinDnsGuard;
+#else
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/file.h>
 #include <unistd.h>
+#include "iptables.hpp"
+using TrafficGuard = IptablesGuard;
+#endif
 
 // ─── Global shutdown flag (set by signal handler) ───────────────────────────
 
@@ -258,7 +269,11 @@ static void print_usage(const char* prog) {
 int main(int argc, char* argv[]) {
     std::string blocklist_path = "blocklist.txt";
     std::string upstream       = "8.8.8.8:53";
-    uint16_t    port           = 15353;
+#ifdef _WIN32
+    uint16_t port = 53;    // netsh points DNS to 127.0.0.1:53 — must use port 53
+#else
+    uint16_t port = 15353; // iptables redirects port 53 → 15353
+#endif
 
     for (int i = 1; i < argc; i++) {
         const std::string arg = argv[i];
@@ -272,6 +287,30 @@ int main(int argc, char* argv[]) {
         else { fprintf(stderr, "Unknown option: %s\n", arg.c_str()); return 1; }
     }
 
+#ifdef _WIN32
+    // Initialize Winsock
+    WSADATA wsa;
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
+        fprintf(stderr, "Error: WSAStartup failed.\n");
+        return 1;
+    }
+
+    // Admin check
+    if (!IsUserAnAdmin()) {
+        fprintf(stderr, "Error: url-block requires Administrator privileges.\n"
+                        "       Right-click the executable and select 'Run as Administrator'.\n");
+        WSACleanup();
+        return 1;
+    }
+
+    // Single-instance lock via named mutex
+    HANDLE hMutex = CreateMutexA(nullptr, TRUE, "Global\\url-block-instance");
+    if (!hMutex || GetLastError() == ERROR_ALREADY_EXISTS) {
+        fprintf(stderr, "url-block is already running.\n");
+        WSACleanup();
+        return 1;
+    }
+#else
     // Root check
     if (geteuid() != 0) {
         fprintf(stderr, "Error: url-block requires root privileges.\n"
@@ -291,6 +330,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     // lock_fd stays open until process exits — lock released automatically
+#endif
 
     // Load blocklist
     auto blocklist = std::make_shared<Blocklist>();
@@ -303,12 +343,19 @@ int main(int argc, char* argv[]) {
     // Shared stats
     auto stats = std::make_shared<Stats>();
 
-    // Install iptables rules (RAII – removed on destruction)
-    IptablesGuard ipt;
+    // Install traffic redirect rules (RAII – removed on destruction)
+    TrafficGuard ipt;
     if (!ipt.setup(port)) {
+#ifdef _WIN32
+        fprintf(stderr,
+            "Error: failed to redirect DNS traffic.\n"
+            "       Make sure no other DNS service is using port 53.\n");
+        WSACleanup();
+#else
         fprintf(stderr,
             "Error: failed to install iptables rules.\n"
             "       Make sure iptables is installed: apt install iptables\n");
+#endif
         return 1;
     }
 
@@ -363,6 +410,13 @@ int main(int argc, char* argv[]) {
     proxy_thread.join();
     // ipt destructor removes iptables rules automatically
 
+#ifdef _WIN32
+    WSACleanup();
+    ReleaseMutex(hMutex);
+    CloseHandle(hMutex);
+    fprintf(stderr, "\nurl-block stopped. DNS settings restored.\n");
+#else
     fprintf(stderr, "\nurl-block stopped. iptables rules removed.\n");
+#endif
     return 0;
 }

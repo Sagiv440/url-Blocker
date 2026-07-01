@@ -15,9 +15,17 @@ add_executable(url-block
 
 target_include_directories(url-block PRIVATE src)
 
-target_compile_options(url-block PRIVATE
-    -O2 -Wall -Wextra -Wpedantic
-    $<$<CONFIG:Release>:-O3 -march=native>
-)
+if(MSVC)
+    target_compile_options(url-block PRIVATE /W4 /O2)
+else()
+    target_compile_options(url-block PRIVATE
+        -O2 -Wall -Wextra -Wpedantic
+        $<$<CONFIG:Release>:-O3 -march=native>
+    )
+endif()
 
-target_link_libraries(url-block PRIVATE pthread)
+if(WIN32)
+    target_link_libraries(url-block PRIVATE ws2_32 iphlpapi shell32)
+else()
+    target_link_libraries(url-block PRIVATE pthread)
+endif()

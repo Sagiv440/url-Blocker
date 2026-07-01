@@ -1,6 +1,8 @@
 #include "proxy.hpp"
 #include "dns.hpp"
 
+#include <cstring>
+
 #ifdef __linux__
 #include <arpa/inet.h>
 #include <cerrno>
@@ -26,7 +28,10 @@ static inline bool sock_invalid(socket_t s) { return s < 0; }
 
 void DnsProxy::run()
 {
-    const socket_t sock = socket(AF_INET, SOCK_DGRAM, 0);
+    // Dual-stack socket: a single AF_INET6 socket with V6ONLY disabled accepts
+    // both native IPv6 traffic and IPv4 traffic (as IPv4-mapped addresses), so
+    // DNS queries reach us regardless of which family the OS resolver picks.
+    const socket_t sock = socket(AF_INET6, SOCK_DGRAM, 0);
     if (sock_invalid(sock))
         return;
 
@@ -38,12 +43,14 @@ void DnsProxy::run()
 #endif
 
     const int on = 1;
+    const int v6only_off = 0;
     setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char *>(&on), sizeof(on));
+    setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char *>(&v6only_off), sizeof(v6only_off));
 
-    struct sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(port_);
+    struct sockaddr_in6 addr{};
+    addr.sin6_family = AF_INET6;
+    addr.sin6_addr = in6addr_any;
+    addr.sin6_port = htons(port_);
 
     if (bind(sock, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0)
     {
@@ -69,7 +76,7 @@ void DnsProxy::run()
         if (select(sock + 1, &fds, nullptr, nullptr, &tv) <= 0)
             continue;
 
-        struct sockaddr_in client{};
+        struct sockaddr_in6 client{};
         socklen_t cl_len = sizeof(client);
 
 #ifdef __linux__
@@ -94,11 +101,29 @@ void DnsProxy::run()
 #endif
 }
 
-void DnsProxy::handle(socket_t sock, const uint8_t *data, size_t len,
-                      struct sockaddr_in &client)
+// IPv4 traffic on a dual-stack socket arrives as an IPv4-mapped IPv6 address
+// (::ffff:a.b.c.d). Detect it and print the plain IPv4 form for readability.
+static std::string format_client_ip(const struct sockaddr_in6 &client)
 {
-    char client_ip[INET_ADDRSTRLEN] = "?";
-    inet_ntop(AF_INET, &client.sin_addr, client_ip, sizeof(client_ip));
+    static const uint8_t v4_mapped_prefix[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF};
+    char buf[INET6_ADDRSTRLEN] = "?";
+    if (memcmp(client.sin6_addr.s6_addr, v4_mapped_prefix, sizeof(v4_mapped_prefix)) == 0)
+    {
+        struct in_addr v4addr{};
+        memcpy(&v4addr, client.sin6_addr.s6_addr + 12, 4);
+        inet_ntop(AF_INET, &v4addr, buf, sizeof(buf));
+    }
+    else
+    {
+        inet_ntop(AF_INET6, &client.sin6_addr, buf, sizeof(buf));
+    }
+    return buf;
+}
+
+void DnsProxy::handle(socket_t sock, const uint8_t *data, size_t len,
+                      struct sockaddr_in6 &client)
+{
+    const std::string client_ip = format_client_ip(client);
 
     // Parse upstream once (already done in run(), but reuse here via members)
     std::string up_host = upstream_;

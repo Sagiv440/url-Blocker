@@ -25,9 +25,11 @@ public:
         if (adapters_.empty()) return false;
         for (const auto& a : adapters_) {
             netsh("interface ip set dns \"" + a + "\" static 127.0.0.1");
-            // Clear IPv6 DNS servers too — Windows prefers IPv6 resolvers when
-            // present, which would otherwise bypass the IPv4-only proxy entirely.
-            netsh("interface ipv6 set dns \"" + a + "\" static none");
+            // Windows prefers IPv6 DNS servers when present (often learned via
+            // Router Advertisement, which "static none" can't override). Point
+            // IPv6 at the loopback too — the proxy listens dual-stack so both
+            // land on the same socket.
+            netsh("interface ipv6 set dns \"" + a + "\" static ::1");
         }
         active_ = true;
         return true;

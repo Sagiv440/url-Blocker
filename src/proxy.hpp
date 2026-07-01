@@ -32,7 +32,7 @@ private:
     std::atomic<bool> running_{true};
 
     void handle(socket_t sock, const uint8_t* buf, size_t len,
-                struct sockaddr_in& client_addr);
+                struct sockaddr_in6& client_addr);
 
     bool forward(const uint8_t* query, size_t qlen,
                  uint8_t* resp, size_t& rlen,

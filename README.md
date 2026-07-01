@@ -159,3 +159,106 @@ sudo systemctl start url-block
 Edit `/opt/url-block/blocklist.txt` and either:
 - Restart the service: `sudo systemctl restart url-block`
 - Or if running interactively, press `r` to reload without restarting
+
+---
+
+## Running on Windows
+
+The same source builds on Windows too, using `netsh` for DNS redirection instead of `iptables`.
+
+### Requirements
+
+- Visual Studio Build Tools (or Visual Studio) with the "Desktop development with C++" workload
+- `cmake`
+
+### Build
+
+```powershell
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+```
+
+The binary is created at `build\Release\url-block.exe`.
+
+### Run interactively (with TUI)
+
+Right-click `url-block.exe` → **Run as administrator**, or from an elevated PowerShell:
+
+```powershell
+.\build\Release\url-block.exe
+```
+
+Same flags as Linux (`-b`, `-u`, `-p`, `-h`), except the default port is `53` — Windows points DNS straight at the proxy via `netsh` rather than redirecting with `iptables`. Quit with `q`; this is what triggers DNS cleanup, so always prefer it over closing the window.
+
+### Run as a background service
+
+Windows services must speak a specific control protocol that a plain console app doesn't implement, so this uses [NSSM](https://nssm.cc/) to wrap `url-block.exe` as a real service. All commands below need an elevated (Administrator) PowerShell.
+
+#### Step 1 — Install NSSM
+
+```powershell
+choco install nssm -y
+```
+
+#### Step 2 — Copy files to a permanent location
+
+```powershell
+mkdir "C:\Program Files\url-block"
+copy build\Release\url-block.exe "C:\Program Files\url-block\"
+copy blocklist.txt "C:\Program Files\url-block\"
+```
+
+#### Step 3 — Register the service
+
+```powershell
+nssm install url-block "C:\Program Files\url-block\url-block.exe"
+nssm set url-block AppDirectory "C:\Program Files\url-block"
+nssm set url-block AppParameters "-d"
+nssm set url-block DisplayName "url-block DNS Firewall"
+nssm set url-block AppStdout "C:\Program Files\url-block\logs\stdout.log"
+nssm set url-block AppStderr "C:\Program Files\url-block\logs\stderr.log"
+nssm set url-block AppStopMethodConsole 5000
+```
+
+The `-d` flag is required — it skips the TUI, which would otherwise fill the log files with raw ANSI redraw output since a service has no visible desktop to draw on (services run in a separate, non-interactive session).
+
+#### Step 4 — Start it
+
+```powershell
+Start-Service url-block
+```
+
+#### Step 5 — Verify it's running
+
+```powershell
+Get-Service url-block
+```
+
+You should see `Status: Running`.
+
+### Managing the service
+
+```powershell
+Stop-Service url-block                            # stop
+Start-Service url-block                           # start
+Set-Service url-block -StartupType Automatic       # start on boot
+Set-Service url-block -StartupType Manual          # don't start on boot
+nssm edit url-block                                # GUI editor for settings
+```
+
+### Viewing activity while the service is running
+
+Like the Linux TUI, the live view only renders when run interactively. To check on it:
+
+```powershell
+Stop-Service url-block
+& "C:\Program Files\url-block\url-block.exe"   # run elevated, with TUI
+# Press q to exit, then:
+Start-Service url-block
+```
+
+### Updating the blocklist
+
+Edit `C:\Program Files\url-block\blocklist.txt`, then either restart the service or, if running interactively, press `r` to reload without restarting.
+
+> **Note:** after rebuilding, re-copy `url-block.exe` to `C:\Program Files\url-block\`. The service runs from that copy, not from `build\Release\` directly, so a rebuild alone won't update it.

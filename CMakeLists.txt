@@ -26,6 +26,7 @@ endif()
 
 if(WIN32)
     target_link_libraries(url-block PRIVATE ws2_32 iphlpapi shell32)
+    target_compile_definitions(url-block PRIVATE NOMINMAX)
 else()
     target_link_libraries(url-block PRIVATE pthread)
 endif()

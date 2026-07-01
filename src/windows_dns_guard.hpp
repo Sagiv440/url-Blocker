@@ -23,8 +23,12 @@ public:
     bool setup(uint16_t /*port*/) {
         adapters_ = get_adapter_names();
         if (adapters_.empty()) return false;
-        for (const auto& a : adapters_)
+        for (const auto& a : adapters_) {
             netsh("interface ip set dns \"" + a + "\" static 127.0.0.1");
+            // Clear IPv6 DNS servers too — Windows prefers IPv6 resolvers when
+            // present, which would otherwise bypass the IPv4-only proxy entirely.
+            netsh("interface ipv6 set dns \"" + a + "\" static none");
+        }
         active_ = true;
         return true;
     }
@@ -32,8 +36,10 @@ public:
     void cleanup() {
         if (!active_) return;
         active_ = false;
-        for (const auto& a : adapters_)
+        for (const auto& a : adapters_) {
             netsh("interface ip set dns \"" + a + "\" dhcp");
+            netsh("interface ipv6 set dns \"" + a + "\" dhcp");
+        }
     }
 
 private:

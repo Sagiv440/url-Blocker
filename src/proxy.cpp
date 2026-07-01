@@ -38,7 +38,7 @@ void DnsProxy::run()
 #endif
 
     const int on = 1;
-    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char *>(&on), sizeof(on));
 
     struct sockaddr_in addr{};
     addr.sin_family = AF_INET;
